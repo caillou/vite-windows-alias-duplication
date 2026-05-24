@@ -1,1 +1,0 @@
-export { TOKEN } from './shared';

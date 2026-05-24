@@ -42,7 +42,7 @@ A failing Windows job is the bug being present — that asymmetry IS the proof t
 is Windows-specific. (CI has no `continue-on-error`, so the red Windows job is intentional.)
 
 Confirmed run: <https://github.com/caillou/vite-windows-alias-duplication/actions/runs/26359787682>
-(ubuntu-latest `success` / `OK`, 5 modules; windows-latest `failure` / `DUPLICATED`, 6 modules).
+(ubuntu-latest `success` / `OK`, 3 modules; windows-latest `failure` / `DUPLICATED`, 4 modules).
 
 Latest runs: <https://github.com/caillou/vite-windows-alias-duplication/actions/workflows/repro.yml>
 
@@ -63,7 +63,7 @@ pnpm run repro    # = vite build && node dist/index.js
 ### Windows (reproduced)
 
 ```
-✓ 6 modules transformed.
+✓ 4 modules transformed.
 DUPLICATED: shared module bundled more than once.
   viaRelative: Symbol(shared-singleton)
   viaAlias   : Symbol(shared-singleton)
@@ -118,8 +118,8 @@ the duplication**:
 
 | `resolve.tsconfigPaths` | who resolves `@shared` | resolved id | result |
 |---|---|---|---|
-| `false` (default) | Rolldown native auto-discovery | back-slash | **6 modules, DUPLICATED** |
-| `true` | Vite's native handling | forward-slash | 5 modules, `OK` |
+| `false` (default) | Rolldown native auto-discovery | back-slash | **4 modules, DUPLICATED** |
+| `true` | Vite's native handling | forward-slash | 3 modules, `OK` |
 
 So `resolve.tsconfigPaths: true` routes tsconfig-paths resolution through Vite's own
 (normalized) handling instead of letting Rolldown's resolver emit a back-slash id. This
