@@ -1,0 +1,32 @@
+name: Repro
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  repro:
+    name: Repro (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack (pnpm from packageManager field)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Reproduce (expect OK on Linux, DUPLICATED on Windows)
+        run: pnpm run repro

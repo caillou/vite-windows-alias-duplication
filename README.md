@@ -9,6 +9,19 @@ module. The two copies are distinct instances, so a module-level singleton (here
 showed up as a duplicated `React.createContext`, so a Provider and a `useContext`
 bound to different context objects ("must be used within a Provider").
 
+## Continuous verification
+
+A GitHub Actions matrix (`.github/workflows/repro.yml`) runs the repro on both
+`ubuntu-latest` and `windows-latest` on every push.
+
+Expected outcome:
+
+- **Linux job green** — prints `OK`, single module instance, exit 0.
+- **Windows job red** — prints `DUPLICATED`, exit 1.
+
+A failing Windows job is the bug being present — that asymmetry IS the proof that this
+is Windows-specific. (CI has no `continue-on-error`, so the red Windows job is intentional.)
+
 The root cause is a path-normalization mismatch: the two import specifiers resolve to
 ids that differ **only by slash direction** (forward vs back slash). Rolldown's module
 graph keys on the raw id string and treats them as two modules.
@@ -34,13 +47,11 @@ Exit code: **1**. Expected (if not buggy): `OK: single shared module instance ..
 
 `dist/index.js` contains the shared module **twice** (`grep -c 'Symbol("shared-singleton")' dist/index.js` → **2**), emitted as two separate `//#region src/shared/index.js` blocks producing `TOKEN$1` and `TOKEN`.
 
-### Linux / WSL
+### Linux
 
-**Not verified — blocker.** The default WSL distro (Ubuntu 26.04) has no native Node /
-pnpm; the PATH only exposed the Windows `nvm4w` shims, which fail under WSL with
-`/bin/sh^M: bad interpreter` (CRLF) errors. Installing a Node toolchain into WSL was
-out of scope per the task constraints. Expectation from the originating real-world
-case: Linux produces a single instance (`OK`, exit 0), i.e. the bug is Windows-specific.
+Verified in CI on `ubuntu-latest`: a single shared module instance (`OK`, exit 0).
+The bug is Windows-specific. See **Continuous verification** above for the live matrix
+run.
 
 ## Resolver smoking gun
 
