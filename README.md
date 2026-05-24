@@ -41,7 +41,7 @@ Expected outcome:
 A failing Windows job is the bug being present — that asymmetry IS the proof that this
 is Windows-specific. (CI has no `continue-on-error`, so the red Windows job is intentional.)
 
-Confirmed run: <https://github.com/caillou/vite-windows-alias-duplication/actions/runs/26358951646>
+Confirmed run: <https://github.com/caillou/vite-windows-alias-duplication/actions/runs/26359787682>
 (ubuntu-latest `success` / `OK`, 5 modules; windows-latest `failure` / `DUPLICATED`, 6 modules).
 
 Latest runs: <https://github.com/caillou/vite-windows-alias-duplication/actions/workflows/repro.yml>
