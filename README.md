@@ -22,6 +22,9 @@ Expected outcome:
 A failing Windows job is the bug being present — that asymmetry IS the proof that this
 is Windows-specific. (CI has no `continue-on-error`, so the red Windows job is intentional.)
 
+Confirmed run: <https://github.com/caillou/vite-windows-alias-duplication/actions/runs/26358831079>
+(ubuntu-latest `success` / `OK`, 5 modules; windows-latest `failure` / `DUPLICATED`, 6 modules).
+
 The root cause is a path-normalization mismatch: the two import specifiers resolve to
 ids that differ **only by slash direction** (forward vs back slash). Rolldown's module
 graph keys on the raw id string and treats them as two modules.
