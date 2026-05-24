@@ -7,12 +7,26 @@
 
 Minimal reproduction of a **Vite 8 / Rolldown** bug on **Windows**: when one source
 file is imported through two specifiers that resolve to the same physical file — one a
-**relative** path (`./shared`) and one a **tsconfig path alias** (`@shared/index`,
-resolved by `vite-tsconfig-paths`) — the production build emits **two copies** of that
-module. The two copies are distinct instances, so a module-level singleton (here a
-`Symbol`) is duplicated and the two values are no longer `===`. In a real app this
-showed up as a duplicated `React.createContext`, so a Provider and a `useContext`
-bound to different context objects ("must be used within a Provider").
+**relative** path (`./shared`) and one a **tsconfig path alias** (`@shared/index`) —
+the production build emits **two copies** of that module. The two copies are distinct
+instances, so a module-level singleton (here a `Symbol`) is duplicated and the two
+values are no longer `===`. In a real app this showed up as a duplicated
+`React.createContext`, so a Provider and a `useContext` bound to different context
+objects ("must be used within a Provider").
+
+The alias is resolved by **Vite 8 / Rolldown's own native tsconfig-path resolution** —
+**no plugin is involved.** This repo ships with no Vite plugins at all. Rolldown's
+native resolver auto-discovers `tsconfig.json` and applies its `compilerOptions.paths`,
+and on Windows it emits the resolved id with **back-slashes** while the relative import
+resolves to a **forward-slash** id. Rolldown keys its module graph on the raw id string
+and treats the two as separate modules.
+
+> **`vite-tsconfig-paths` was ruled out.** An earlier draft of this repo blamed that
+> plugin. That attribution was wrong. The plugin only resolves importers whose
+> extension matches `/\.[mc]?tsx?$/` by default (it skips `.js` importers unless
+> `allowJs` or a `jsconfig.json` is in play), and dropping the plugin entirely does
+> **not** change the outcome: the duplication persists. The duplication is produced by
+> Vite/Rolldown's native resolution, not by the plugin.
 
 ## Continuous verification
 
@@ -32,9 +46,10 @@ Confirmed run: <https://github.com/caillou/vite-windows-alias-duplication/action
 
 Latest runs: <https://github.com/caillou/vite-windows-alias-duplication/actions/workflows/repro.yml>
 
-The root cause is a path-normalization mismatch: the two import specifiers resolve to
-ids that differ **only by slash direction** (forward vs back slash). Rolldown's module
-graph keys on the raw id string and treats them as two modules.
+The root cause is a path-normalization mismatch inside **Vite 8 / Rolldown's native
+tsconfig-path resolution**: the two import specifiers resolve to ids that differ **only
+by slash direction** (forward vs back slash). Rolldown's module graph keys on the raw
+id string and treats them as two modules.
 
 ## Reproduce
 
@@ -65,24 +80,51 @@ run.
 
 ## Resolver smoking gun
 
-A `load`-hook inspection plugin showed the same file loaded under two ids that differ
-only by slash direction:
+A temporary `load`-hook inspection plugin (not shipped) showed the same file loaded
+under two ids that differ only by slash direction:
 
 ```
-"C:/dev/vite-windows-alias-duplication/src/shared/index.js"     <- relative  ./shared
-"C:\\dev\\vite-windows-alias-duplication\\src\\shared\\index.js" <- alias @shared/index (vite-tsconfig-paths)
+"C:/dev/vite-windows-alias-duplication/src/shared/index.js"      <- relative  ./shared
+"C:\\dev\\vite-windows-alias-duplication\\src\\shared\\index.js"  <- alias @shared/index
 ```
 
-The relative import resolves to a POSIX-style (forward-slash) id; `vite-tsconfig-paths`
-returns a Windows-style (back-slash) id. Rolldown does not normalize these to a single
-module key on Windows, hence the duplicate.
+The relative import resolves to a POSIX-style (forward-slash) id; Rolldown's native
+tsconfig-path resolution returns a Windows-style (back-slash) id. Rolldown does not
+normalize these to a single module key on Windows, hence the duplicate.
 
 ## Which layer is implicated
 
-Reproduced at **Rung C** (`vite-tsconfig-paths` plugin). It does **not** reproduce with
-Vite core's manual `resolve.alias` (Rung A, all specifier variations, and Rung B with
-two separate importer files all printed `OK`). So the duplication is introduced by the
-**alias plugin emitting a back-slash id**, not by Vite core's own alias resolution.
+Isolated empirically on Windows, one variable at a time:
+
+- **`vite-tsconfig-paths` plugin — NOT implicated.** Removing the plugin entirely (no
+  plugins in `vite.config.js`, dependency dropped) still reproduces the duplication.
+  The plugin's default importer filter is `/\.[mc]?tsx?$/`, so it skips `.js` importers
+  anyway.
+- **Vite core `resolve.alias` — NOT implicated.** Mapping `@shared` via Vite's own
+  `resolve.alias`, even feeding a deliberately back-slashed replacement, normalizes to a
+  single forward-slash id and prints `OK`.
+- **Vite 8 / Rolldown native tsconfig-path resolution — IMPLICATED.** With no plugin and
+  the default `resolve.tsconfigPaths: false`, Rolldown's resolver auto-discovers
+  `tsconfig.json` and applies `compilerOptions.paths`, emitting the alias id with
+  back-slashes. Proof it is this layer: renaming `tsconfig.json` so it cannot be found
+  makes the build fail with `Rolldown failed to resolve import "@shared/index"` — so
+  this resolution is reading the tsconfig directly, independent of any plugin.
+
+### The `resolve.tsconfigPaths` option (and the surprising fix)
+
+Vite 8 exposes `resolve.tsconfigPaths` (boolean, **default `false`**). Counter-
+intuitively, the **default `false` is the buggy state** and setting it to **`true` fixes
+the duplication**:
+
+| `resolve.tsconfigPaths` | who resolves `@shared` | resolved id | result |
+|---|---|---|---|
+| `false` (default) | Rolldown native auto-discovery | back-slash | **6 modules, DUPLICATED** |
+| `true` | Vite's native handling | forward-slash | 5 modules, `OK` |
+
+So `resolve.tsconfigPaths: true` routes tsconfig-paths resolution through Vite's own
+(normalized) handling instead of letting Rolldown's resolver emit a back-slash id. This
+repo intentionally leaves the option at its default to demonstrate the out-of-the-box
+behavior.
 
 ## Pinned versions
 
@@ -92,4 +134,3 @@ two separate importer files all printed `OK`). So the duplication is introduced 
 | pnpm | 10.33.0 (via corepack / `packageManager`) |
 | vite | 8.0.10 |
 | rolldown (bundled in vite) | 1.0.0-rc.17 |
-| vite-tsconfig-paths | 6.1.1 |
