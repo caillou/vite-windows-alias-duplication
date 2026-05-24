@@ -1,5 +1,10 @@
 # vite-windows-alias-duplication
 
+> **AI disclosure** — This minimal reproduction repo (the repro code, the CI workflow,
+> and this README) was created with the assistance of AI (Claude). The bug itself was
+> first observed in a real codebase; the AI was used to isolate it down to this minimal,
+> CI-verified case.
+
 Minimal reproduction of a **Vite 8 / Rolldown** bug on **Windows**: when one source
 file is imported through two specifiers that resolve to the same physical file — one a
 **relative** path (`./shared`) and one a **tsconfig path alias** (`@shared/index`,
@@ -88,9 +93,3 @@ two separate importer files all printed `OK`). So the duplication is introduced 
 | vite | 8.0.10 |
 | rolldown (bundled in vite) | 1.0.0-rc.17 |
 | vite-tsconfig-paths | 6.1.1 |
-
-## AI disclosure
-
-This minimal reproduction repo — the repro code, the CI workflow, and this README —
-was created with the assistance of AI (Claude). The bug itself was first observed in a
-real codebase; the AI was used to isolate it down to this minimal, CI-verified case.
